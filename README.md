@@ -21,8 +21,8 @@ The application itself is very simple. It is composed by a Frontend Web UI writt
 
 Their source code can be obtained here: 
 - [nodejs](https://github.com/brentley/ecsdemo-nodejs)
-- [crystal](github.com/brentley/ecsdemo-crystal)
-- [frontend](github.com/brentley/ecsdemo-frontend)
+- [crystal](https://github.com/brentley/ecsdemo-crystal)
+- [frontend](https://github.com/brentley/ecsdemo-frontend)
 
 
 ## Topology
