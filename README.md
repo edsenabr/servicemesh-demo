@@ -2,6 +2,29 @@
 
 This project aims to demonstrate how to deploy a microservices architecture on AWS ECS, leveraging on AWS App Mesh for East/West integration between those services and on AWS API Gateway for North/South integration. 
 
+Before diving into that, let's recap the concepts mentioned above:  
+
+![Application Architecture](./static/north-south-east-west.png) 
+
+Whenever you define a boundary (it could be a Datacenter, a Service Mesh, or even a Subnet), East/West is the communication that happens within that boundary, like the blue arrow in the diagram above, and North/South is the inbound communication to that boundary, like the red arrow. 
+
+This project uses a simple application, composed by a Frontend Web UI written in [ruby](https://www.ruby-lang.org/en/) and two different backend services, one written in [nodejs](https://nodejs.org/en/) and another one written in [crystal](https://crystal-lang.org). 
+
+![Application Architecture](./static/application-architecture.png) 
+
+Each backend services returns a 'Hello World' message, informing its IP address and Availability Zone within AWS Cloud. The frontend UI makes repetitive and infinite requests to those backend services, writing down their responses and plotting on a map the path each request took:
+
+![Frontend UI](./static/a-b-c.svg) 
+
+On the diagram above, the request arrived at the frontend UI on the availability zone A, and then a request was made to the nodejs backend on the zone B, and to the crystal backend on the zone C. 
+
+
+Their source code can be obtained here: 
+- [nodejs](https://github.com/brentley/ecsdemo-nodejs)
+- [crystal](https://github.com/brentley/ecsdemo-crystal)
+- [frontend](https://github.com/brentley/ecsdemo-frontend)
+
+
 The architecture of this deployment uses the following AWS Services:
 
 1. [AWS CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/GettingStarted.html) : Used to deploy this whole architecture using the '*infrastructure as code*' paradigm.
@@ -15,14 +38,7 @@ The architecture of this deployment uses the following AWS Services:
 
 > **DISCLAIMER**: This not a production ready system. It is meant only to educate in terms of what can be achieved with the components aforementioned. In order to understand AWS best practices to production topologies, please refer to [AWS Well Architected Framework](https://aws.amazon.com/architecture/well-architected/)
 
-The application itself is very simple. It is composed by a Frontend Web UI written in [ruby](https://www.ruby-lang.org/en/) and two different backend services, one written in [nodejs](https://nodejs.org/en/) and another one written in [crystal](https://crystal-lang.org). 
-
-![Application Architecture](./static/application-architecture.png) 
-
-Their source code can be obtained here: 
-- [nodejs](https://github.com/brentley/ecsdemo-nodejs)
-- [crystal](https://github.com/brentley/ecsdemo-crystal)
-- [frontend](https://github.com/brentley/ecsdemo-frontend)
+The application itself is very simple. 
 
 
 ## Topology
