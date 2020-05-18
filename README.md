@@ -38,8 +38,6 @@ The architecture of this deployment uses the following AWS Services:
 
 > **DISCLAIMER**: This not a production ready system. It is meant only to educate in terms of what can be achieved with the components aforementioned. In order to understand AWS best practices to production topologies, please refer to [AWS Well Architected Framework](https://aws.amazon.com/architecture/well-architected/)
 
-The application itself is very simple. 
-
 
 ## Topology
 
