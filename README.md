@@ -1,19 +1,19 @@
 # Service Mesh deployment demo
 
-This project aims to demonstrate how to deploy a microservices architecture on AWS ECS, leveraging on AWS App Mesh for Lest/West integration betweeen those servives and on AWS API Gateway for North/South integration. 
+This project aims to demonstrate how to deploy a microservices architecture on AWS ECS, leveraging on AWS App Mesh for Lest/West integration between those services and on AWS API Gateway for North/South integration. 
 
 The architecture of this deployment is using the following AWS Services:
 
 1. [AWS CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/GettingStarted.html) : Used to deploy this whole architecture using the '*infrastructure as code*' paradigm.
 1. [Amazon VPC](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-getting-started.html) : Used to define an isolated and secure network perimeter for the application. 
-1. [Amazon ECS](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-ecs-ec2.html) : All the components of this application were encapsulated into containers. ECS is a container orchestration that aims to provide escalability and resiliency to a container-based architecture. 
+1. [Amazon ECS](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-ecs-ec2.html) : All the components of this application were encapsulated into containers. ECS is a container orchestration that aims to provide scalability and resiliency to a container-based architecture. 
 1. [Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancer-getting-started.html) : In order to provide internet-facing, easy access, to the frontend UI, an application load balancer was added to the solution.
-1. [Network Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancer-getting-started.html) : Used by API Gateway as its entry pointo into the VPC, and also load balancing the requests among the difference instances of each backend service. 
-1. [AWS Cloud Map](https://docs.aws.amazon.com/cloud-map/latest/dg/setting-up-cloud-map.html) : Provides *service discovery* capabilites to the application. Since all these components were deployed using an auto-scaling topology using ephemeral containers, it is important to have a mechanism to allow each service to discover the location of other services. 
+1. [Network Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancer-getting-started.html) : Used by API Gateway as its entry point into the VPC, and also load balancing the requests among the difference instances of each backend service. 
+1. [AWS Cloud Map](https://docs.aws.amazon.com/cloud-map/latest/dg/setting-up-cloud-map.html) : Provides *service discovery* capabilities to the application. Since all these components were deployed using an auto-scaling topology using ephemeral containers, it is important to have a mechanism to allow each service to discover the location of other services. 
 1. [AWS App Mesh](https://docs.aws.amazon.com/app-mesh/latest/userguide/appmesh-getting-started.html) : Creates a service mesh, allowing the microservices to talk to each other in a secure, reliable and scalable way, providing lest/west integration capabilities within the application.
-1. [Amazon API Gateway](https://docs.aws.amazon.com/apigateway/latest/developerguide/getting-started.html) : Encapsulates access to the backend services, adding a layer of control to the application that way allowing north/south integration capabilities to the appllcatiion.
+1. [Amazon API Gateway](https://docs.aws.amazon.com/apigateway/latest/developerguide/getting-started.html) : Encapsulates access to the backend services, adding a layer of control to the application that way allowing north/south integration capabilities to the application.
 
-> **DISCLAIMER**: This not a production ready system. It is meant only to educate in terms of what can be achieved with the components aforementioned. In order to understand AWS best practices to production topopogies, please refer to [AWS Well Architected Framework](https://aws.amazon.com/architecture/well-architected/)
+> **DISCLAIMER**: This not a production ready system. It is meant only to educate in terms of what can be achieved with the components aforementioned. In order to understand AWS best practices to production topologies, please refer to [AWS Well Architected Framework](https://aws.amazon.com/architecture/well-architected/)
 
 The application itself is very simple. It is composed by a Frontend Web UI written in [ruby](https://www.ruby-lang.org/en/) and two different backend services, one written in [nodejs](https://nodejs.org/en/) and another one written in [crystal](https://crystal-lang.org). 
 
@@ -52,16 +52,16 @@ There are a few concepts hidden on the previous diagram that needs to be explore
 &nbsp;  
 Every time a new task is started at the ECS cluster, the ECS service register this task on AWS Cloud Map, and a DNS entry is created on Route 53 for this task. The ***Virtual Service*** is this name being used to register the task.
 
-- Instead of reaching direclty the ***Virtual Node*** (what could be done), the frontend UI is talking to the ***Virtual Router*** component. This router has the ability to abstract the connectivity to several distinct ***Virtual Nodes***, adding intelligence to the routing logic. For instance, if you want to setup a blue/green deployment of one of the backend services, you could add the routing rules on this component.  
+- Instead of reaching directly the ***Virtual Node*** (what could be done), the frontend UI is talking to the ***Virtual Router*** component. This router has the ability to abstract the connectivity to several distinct ***Virtual Nodes***, adding intelligence to the routing logic. For instance, if you want to setup a blue/green deployment of one of the backend services, you could add the routing rules on this component.  
 
 ### Red Scenario
 
 ![alt](./static/dataflow-apigw.png) 
 
-- This scenario is using a 100% private api. Despite of the fact that API Gateway is a public AWS service, it has the ability to expose privatelly APIs only to authorized 
- VPCs, throughgt the use of ***Interface Endpoints*** deployed onto those VPCs. This setup allows a private communication between the service consumer and the API itself. 
+- This scenario is using a 100% private api. Despite of the fact that API Gateway is a public AWS service, it has the ability to expose privately APIs only to authorized 
+ VPCs, through the use of ***Interface Endpoints*** deployed onto those VPCs. This setup allows a private communication between the service consumer and the API itself. 
 
-- For accesing private services on a AWS Account without having the need to expose them on the internet, API Gateway has the ability to leverage a ***VPC Link*** integration. This setup allows a private communication between the API and its backend services. 
+- For accessing private services on a AWS Account without having the need to expose them on the internet, API Gateway has the ability to leverage a ***VPC Link*** integration. This setup allows a private communication between the API and its backend services. 
 
 - You can see that the backend services (nodejs, crystal) are the very same of the ones being accessed in the previous scenario. This setup demonstrates that a service lying on a service mesh can be exposed to consumers outside of the mesh as well.
 
