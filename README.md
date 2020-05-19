@@ -43,11 +43,12 @@ The architecture of this deployment uses the following AWS Services:
 
 As mentioned earlier, this application will be deployed onto a ECS cluster, using a service mesh to encapsulate it. In the next diagram, notice that there are 2 different paths used to reach the backend services, colored with different colors.
 
-![alt](./static/architecture.png)
+-	The blue path illustrates the East/West scenario: The frontend UI is part of the service mesh, and it communicates with the backend services directly within the mesh, relying on the Cloud Map service discovery to figure out the ip address where those services are running. 
 
-The blue path illustrates the East/West scenario: The frontend UI is part of the service mesh, and it communicates with the backend services directly within the mesh, relying on the Cloud Map service discovery to figure out the ip address where those services are running. 
+-	The red path illustrates the North/South scenario. The fronted UI is deployed onto a separated VPC on the same AWS account, but it could be running on another AWS account or even on-premises. 
 
-The red path illustrates the North/South scenario. The fronted UI is deployed onto a separated VPC on the same AWS account, but it could be running on another AWS account or even on-premises. 
+	![alt](./static/architecture.png)
+
 
 You can reach the frontend app of these scenarios by accessing its related application load balancer URL on your web browser.
 
@@ -58,8 +59,6 @@ There are a few concepts hidden on the previous diagram that needs to be explore
 
 ### Blue scenario:
 
-![alt](./static/dataflow-mesh.png)
-
 - When the request arrives at the service mesh from the ALB, it reaches the ***Virtual Node*** endpoint declared for the frontend UI. A ***Virtual Node*** is an abstraction of a deployment or physical server where your service/application is running. In this case, we are only using one ***Virtual Node*** per service. It represents its deployment on ECS.  
 
 - When the frontend UI makes a request to a backend service, it uses its ***Virtual Service*** name. Since containers are ephemeral, the only way that the frontend service can figure out where the backend service is running, is by relying on a 'Service Discovery' component.    
@@ -68,24 +67,26 @@ Every time a new task is started at the ECS cluster, the ECS service registers t
 
 - Instead of reaching directly the ***Virtual Node*** (can be done), the frontend UI is talking to the ***Virtual Router*** component. This router has the ability to abstract the connectivity to several distinct ***Virtual Nodes***, adding intelligence to the routing logic. For instance, if you want to setup a blue/green deployment of one of the backend services, you could add the routing rules on this component.  
 
-### Red Scenario
+	![alt](./static/dataflow-mesh.png)
 
-![alt](./static/dataflow-apigw.png) 
+
+### Red Scenario
 
 - Despite the fact that API Gateway is a public AWS service, it has the ability to host private APIs exposed only to authorized VPCs, through the use of ***Interface Endpoints*** deployed onto those VPCs. This setup enables private communication between the service consumer and the API itself.
 
 - For accessing private services on a AWS Account without having the need to expose them on the internet, API Gateway has the ability to leverage a ***VPC Link*** integration. This setup allows a private communication between the API and its backend services. 
 
-- You can see that the backend services (nodejs, crystal) are the same ones being accessed in the previous scenario. This setup demonstrates that a service lying on a mesh can be exposed to consumers outside of it as well.
+- You can see that the backend services (nodejs, crystal) are the same ones being accessed in the previous scenario. This setup demonstrates that a service lying on a mesh can be exposed to consumers outside of it as well.  
+
+	![alt](./static/dataflow-apigw.png) 
+
 
 
 ## CloudFormation Stacks
 
 For simplicity sake, this project was split into 4 reusable Cloud Formation templates, each one being responsible for deploying part of the architecture.
 
-1. **base.yaml**  
-&nbsp;  
-![alt](./static/stack.png)  
+1. **base.yaml**
 &nbsp;  
 Deployed twice, creates the base stack for the **Service Provider (South)** and **Service Consumer (North)**  :
 	-	VPC and its related components
@@ -96,7 +97,10 @@ Deployed twice, creates the base stack for the **Service Provider (South)** and 
 	- Cloud Map instance on the provider VPC onto the **provider** VPC
 	- API Gateway's VPC Link onto the **provider** VPC
 	- API Gateway's Endpoint Interface onto the **consumer** VPC  
-2. **service.yaml**  
+
+	![alt](./static/stack.png)  
+
+2. **service.yaml**
 &nbsp;  
 Deployed 4 times, deploy an application onto the respective ECS cluster and its following related components:
 	- ECS Task Definition 
@@ -109,14 +113,25 @@ Deployed 4 times, deploy an application onto the respective ECS cluster and its 
 	-	Cloud Map service discovery entry onto the **provider** stack
 	-	CloudWatch log group
 
-3.	**north.yaml**  
+3.	**apigw.yaml**
 &nbsp;  
 This template is used to instantiate the resources needed for the red scenario. It deploys the frontend UI as a Task Definition onto the **consumer** ECS Cluster and the same components related to it described on the previous template. In addition to that it deploys the following API Gateway components:
 	- Private REST API 
 	-	Resource and Method for the nodejs backend
 	-	Resource and Method for the crystal backend
 	-	Stage
-	- Deployment
+	- Deployment  
+
+3.	**stack.yaml**
+&nbsp;  
+This is a master template that you can use to deploy the whole solution on your AWS Account. It deploy the following stacks:
+	- Service Provider (South) base stack
+	- Service Consumer (North) base stack
+	- Crystal backend service on the South stack
+	- NodeJS backend service on the South stack
+	- Frontend UI on the South stack
+	- Frontend UI on the North stack
+	- API Gateway private REST APIs
 
 ### Getting Started
 
