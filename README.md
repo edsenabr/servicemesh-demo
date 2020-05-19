@@ -120,6 +120,6 @@ This template is used to instantiate the resources needed for the red scenario. 
 
 ### Getting Started
 
-Click [here](https://console.aws.amazon.com/cloudformation/designer/home?&templateURL=https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/stack.yaml) to deploy this stack on your AWS Account using CloudFormation and play with it. After the stack finishes deploying (it might take up to 20 minutes), navigate to its 'Outputs' tab to get the URLs for the frontend UI on both Red and Blue scenarios.  
+Click [here](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateURL=https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/stack.yaml&stackName=servicemesh-demo) to deploy this stack on your AWS Account using CloudFormation and play with it. After the stack finishes deploying (it might take up to 20 minutes), navigate to its 'Outputs' tab to get the URLs for the frontend UI on both Red and Blue scenarios.  
 
 If you want to extend or make modifications on this demo, the template sources are included in this github repository, inside the [stacks](./stacks) folder.
