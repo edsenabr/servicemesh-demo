@@ -81,40 +81,45 @@ Every time a new task is started at the ECS cluster, the ECS service registers t
 
 ## CloudFormation Stacks
 
-For simplicity sake, this project was split into 3 Cloud Formation templates, each one being responsible for deploying part of the architecture.
+For simplicity sake, this project was split into 4 reusable Cloud Formation templates, each one being responsible for deploying part of the architecture.
 
-1. **stack.yaml**  
+1. **base.yaml**  
 &nbsp;  
-Deploys the base stack of the architecture:  
-	-	**Consumer** and **producer** VPCs and its related components
-	-	1 **Application** Load Balancer on each VPC
-	- 1 **Network** Load Balancer on the provider VPC
-	-	1 ECS cluster on each VPC and its related components
-	-	1 App Mesh instance on the provider VPC
-	- 1 Cloud Map instance on the provider VPC
-	- 1 API Gateway's private REST API 
+![alt](./static/stack.png)  
+&nbsp;  
+Deployed twice, creates the base stack for the **Service Provider (South)** and **Service Consumer (North)**  :
+	-	VPC and its related components
+	-	ECS cluster its related components
+	-	**Application** Load Balancer
+	- **Network** Load Balancer onto the **provider** VPC
+	-	App Mesh instance on the provider VPC onto the **provider** VPC
+	- Cloud Map instance on the provider VPC onto the **provider** VPC
 	- API Gateway's VPC Link onto the **provider** VPC
-	- API Gateway's Endpoint Interface onto the **consumer** VPC
+	- API Gateway's Endpoint Interface onto the **consumer** VPC  
 2. **service.yaml**  
 &nbsp;  
-This template is used to instantiate an application/service on the mesh. It deploys the application as an ECS Task Definition onto the **provider** ECS cluster and its following related components:
+Deployed 4 times, deploy an application onto the respective ECS cluster and its following related components:
+	- ECS Task Definition 
 	-	ECS Service
 	-	Load Balancer listener 
 	-	Load Balancer Target Group
-	-	App Mesh Virtual Service
-	-	App Mesh Virtual Node
-	-	App Mesh Virtual Router and route
-	-	Cloud Map service discovery entry
-	-	2 CloudWatch log groups (one for the application itself, another one for its Envoy sidecar)
+	-	App Mesh Virtual Service onto the **provider** stack
+	-	App Mesh Virtual Node onto the **provider** stack
+	-	App Mesh Virtual Router and route onto the **provider** stack
+	-	Cloud Map service discovery entry onto the **provider** stack
+	-	CloudWatch log group
 
-3.	**api.yaml**  
+3.	**north.yaml**  
 &nbsp;  
-This template is used to instantiate the resources needed for the red scenario. It deploys Frontend application as a Task Definition onto the **consumer** ECS Cluster and the same related components related to it described on the previous template. In addition to that it deploys the following API Gateway components:
+This template is used to instantiate the resources needed for the red scenario. It deploys the frontend UI as a Task Definition onto the **consumer** ECS Cluster and the same components related to it described on the previous template. In addition to that it deploys the following API Gateway components:
+	- Private REST API 
 	-	Resource and Method for the nodejs backend
 	-	Resource and Method for the crystal backend
 	-	Stage
 	- Deployment
 
 ### Getting Started
+
+Click [here](https://console.aws.amazon.com/cloudformation/designer/home?&templateURL=https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/stack.yaml){:target="_blank" rel="noopener"} to deploy this stack on your AWS Account.
 
 In order to deploy this topology on your AWS account, clone this repository and deploy each template in the order mentioned above. Remember that you need to deploy the service stack 3 times (one for each application). If you need detailed instructions, follow [this](./) guide.
