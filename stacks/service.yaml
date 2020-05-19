@@ -1,0 +1,362 @@
+###############################################################################
+#
+# Generic Service
+#
+###############################################################################
+Parameters:
+    AppName:
+        Type: String
+        AllowedValues:
+            - nodejs
+            - crystal
+            - frontend
+
+    DesiredInstances:
+        Type: Number
+        Default: 2
+
+    Role:
+        Type: String
+        AllowedValues:
+            - consumer
+            - provider
+
+    ALBID:
+        Type: String
+
+    API:
+        Type: String
+        Default: ""
+            
+    NLBID:
+        Type: String
+
+    PrivateSubnets:
+        Type: CommaDelimitedList
+
+    SDID:
+        Type: String
+
+    VPCID:
+        Type: String
+
+    VPCCIDR:
+        Type: String
+
+
+Conditions:
+    # If this is the frontend UI, register with ALB instead of NLB
+    Frontend: !Equals [!Ref AppName, "frontend"]
+    # If we're in the Consumer mode, don't create service mesh stuff
+    Provider: !Equals [!Ref Role, "provider"]
+    Consumer: !Equals [!Ref Role, "consumer"]
+
+Mappings:
+  PortMappings:
+    ServicePort:
+      frontend: 80
+      nodejs:   3001
+      crystal:  3002
+
+Resources:
+    ServiceSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Condition: Provider
+        Properties:
+            GroupName: !Sub ${AppName}
+            VpcId: !Ref VPCID
+            GroupDescription: !Sub Clear access to the ${AppName} within the VPC CIDR
+            SecurityGroupIngress:
+                -   CidrIp: !Ref VPCCIDR
+                    IpProtocol: TCP
+                    FromPort: 3000
+                    ToPort: 3000
+
+###############################################################################
+#
+# Load Balancer
+#
+###############################################################################
+    ServiceTargetGroup:
+        Type: AWS::ElasticLoadBalancingV2::TargetGroup
+        Properties:
+            Name: !Sub ${AppName}-${Role}
+            TargetType: !If [Provider, ip, instance]
+            Port: 3000
+            VpcId: !Ref VPCID
+            Protocol: !If [Frontend , HTTP, TCP] 
+            HealthCheckProtocol: !If [Frontend , HTTP, TCP] 
+            HealthCheckIntervalSeconds:  !If [Frontend , 60, 30] 
+            HealthCheckPath: !If [Frontend, /health, !Ref "AWS::NoValue" ]
+            HealthCheckTimeoutSeconds: !If [Frontend, 5, !Ref "AWS::NoValue" ]
+            HealthyThresholdCount: 3
+            UnhealthyThresholdCount: 3
+
+
+    ServiceListener:
+        Type: AWS::ElasticLoadBalancingV2::Listener
+        Properties:
+            LoadBalancerArn: !If [Frontend , !Ref ALBID, !Ref NLBID]
+            Port: !FindInMap [PortMappings, ServicePort, !Ref AppName ]
+            Protocol: !If [Frontend , HTTP, TCP] 
+            DefaultActions:
+                -   Type: forward
+                    TargetGroupArn: !Ref ServiceTargetGroup
+
+###############################################################################
+#
+# Log Groups
+#
+###############################################################################
+    ServiceLogGroup:
+        Type: AWS::Logs::LogGroup
+        Properties:
+            LogGroupName: !Sub service-${Role}-${AppName}
+            RetentionInDays: 1
+
+    EnvoyLogGroup:
+        Type: AWS::Logs::LogGroup
+        Condition: Provider
+        Properties:
+            LogGroupName: !Sub service-provider-envoy-${AppName}
+            RetentionInDays: 1
+
+###############################################################################
+#
+# Service Mesh
+#
+###############################################################################
+    ServiceDiscovery:
+        Type: AWS::ServiceDiscovery::Service
+        Condition: Provider
+        Properties: 
+            Name: !Sub ${AppName}
+            NamespaceId: !Ref SDID
+            Description: !Sub Service discovery entry for ${AppName}
+            DnsConfig:
+                DnsRecords:
+                    -   TTL: 5
+                        Type: A
+                RoutingPolicy: MULTIVALUE
+            HealthCheckCustomConfig:
+                FailureThreshold: 3
+
+    VirtualNode:
+        Type: AWS::AppMesh::VirtualNode
+        Condition: Provider
+        Properties:
+            VirtualNodeName: !Sub ${AppName}-ecs
+            MeshName: servicemesh-demo
+            Spec: 
+                Listeners: 
+                    -   HealthCheck: 
+                            HealthyThreshold: 3
+                            IntervalMillis: 60000
+                            Path: /health
+                            Port: 3000
+                            Protocol: http
+                            TimeoutMillis: 5000
+                            UnhealthyThreshold: 3
+                        PortMapping: 
+                            Port: 3000
+                            Protocol: http
+                Logging: 
+                    AccessLog: 
+                        File: 
+                            Path: /dev/stdout
+                ServiceDiscovery: 
+                    AWSCloudMap: 
+                        NamespaceName: servicemesh-demo.local
+                        ServiceName: !Sub ${AppName}
+                Backends:
+                    -   !If
+                        -   Frontend
+                        -   VirtualService:
+                                VirtualServiceName: crystal.servicemesh-demo.local
+                        -   !Ref "AWS::NoValue"
+                    -   !If
+                        -   Frontend
+                        -   VirtualService:
+                                VirtualServiceName: nodejs.servicemesh-demo.local
+                        -   !Ref "AWS::NoValue"
+
+                
+    VirtualRouter:
+        Type: AWS::AppMesh::VirtualRouter
+        Condition: Provider
+        Properties: 
+            VirtualRouterName: !Sub ${AppName}-router
+            MeshName: servicemesh-demo
+            Spec: 
+                Listeners: 
+                    -   PortMapping: 
+                            Port: !FindInMap [PortMappings, ServicePort, !Ref AppName]
+                            Protocol: http
+                      
+    Route:
+        Type: AWS::AppMesh::Route
+        Condition: Provider
+        Properties: 
+            RouteName: !Sub ${AppName}
+            MeshName: servicemesh-demo
+            VirtualRouterName: !GetAtt VirtualRouter.VirtualRouterName
+            Spec: 
+                HttpRoute: 
+                    Action: 
+                        WeightedTargets: 
+                            -   VirtualNode: !Sub ${AppName}-ecs
+                                Weight: 1
+                    Match: 
+                        Prefix: /
+                Priority: 10
+
+    VirtualService:
+        Type: AWS::AppMesh::VirtualService
+        Condition: Provider
+        Properties: 
+            VirtualServiceName: !Sub ${AppName}.servicemesh-demo.local
+            MeshName: servicemesh-demo
+            Spec: 
+                Provider: 
+                    VirtualRouter: 
+                        VirtualRouterName: !GetAtt VirtualRouter.VirtualRouterName
+
+###############################################################################
+#
+# ECS
+#
+###############################################################################
+    Service:
+        Type: AWS::ECS::Service
+        Properties:
+            ServiceName: !Ref AppName
+            Cluster: !Sub service-${Role}-cluster
+            DesiredCount: !Ref DesiredInstances
+            TaskDefinition: !Ref ServiceTaskDefinition
+            DeploymentConfiguration:
+                MaximumPercent: 100
+                MinimumHealthyPercent: 0
+            PlacementStrategies:
+                - Type: spread
+                  Field: attribute:ecs.availability-zone
+            PlacementConstraints:
+                - Type: distinctInstance
+            NetworkConfiguration:
+                !If
+                    - Provider
+                    -   AwsvpcConfiguration:
+                            AssignPublicIp: DISABLED
+                            SecurityGroups: [!Ref ServiceSecurityGroup]
+                            Subnets: !Ref PrivateSubnets
+                    - !Ref "AWS::NoValue"
+            LoadBalancers:
+                -   ContainerName: !Sub ${AppName}-${Role}
+                    ContainerPort: 3000
+                    TargetGroupArn: !Ref ServiceTargetGroup
+            ServiceRegistries:
+                !If
+                    - Provider
+                    -   
+                        -   ContainerName: !Sub ${AppName}-${Role}
+                            RegistryArn: !GetAtt ServiceDiscovery.Arn
+                    - !Ref "AWS::NoValue"
+
+    ServiceTaskDefinition:
+        Type: AWS::ECS::TaskDefinition
+        Properties:
+            NetworkMode: !If [ Provider, awsvpc, bridge]
+            Family: !Sub ${AppName}-${Role}
+            ContainerDefinitions:
+                -   Name: !Sub ${AppName}-${Role}
+                    StopTimeout: 5
+                    StartTimeout: 120
+                    Environment: 
+                        -   !If
+                            -   Frontend
+                            -   Name: CRYSTAL_URL
+                                Value: 
+                                    !If
+                                        -   Provider
+                                        -   !Sub http://crystal.servicemesh-demo.local:3002/crystal/
+                                        -   !Sub https://${API}.execute-api.${AWS::Region}.amazonaws.com/default/crystal
+                            -   !Ref "AWS::NoValue"
+                        -   !If
+                            -   Frontend
+                            -   Name: NODEJS_URL
+                                Value: 
+                                    !If
+                                        -   Provider
+                                        -   !Sub http://nodejs.servicemesh-demo.local:3001/
+                                        -   !Sub https://${API}.execute-api.${AWS::Region}.amazonaws.com/default/nodejs
+                            -   !Ref "AWS::NoValue"
+                    Essential: true
+                    Image: !Sub brentley/ecsdemo-${AppName}
+                    Memory: !If [Frontend, 256, 128]
+                    HealthCheck:
+                        Command: [ "CMD-SHELL", "curl -f http://localhost:3000/health || exit 1" ]
+                        StartPeriod: 120
+                        Retries: 3
+                        Timeout: 5
+                        Interval: 60
+                    PortMappings:
+                        -   ContainerPort: 3000
+                            HostPort: 3000
+                    LogConfiguration:
+                        LogDriver: awslogs
+                        Options:
+                            awslogs-group: !Ref ServiceLogGroup
+                            awslogs-region: !Ref AWS::Region
+                    LinuxParameters:
+                        InitProcessEnabled: true
+                    DependsOn:
+                        -   !If
+                            -   Provider
+                            -   Condition: HEALTHY
+                                ContainerName: envoy
+                            - !Ref "AWS::NoValue"
+                -   !If
+                    -   Provider
+                    -   Name: envoy
+                        User: 1337
+                        Essential: true
+                        Image: !Sub 840364872350.dkr.ecr.${AWS::Region}.amazonaws.com/aws-appmesh-envoy:v1.12.3.0-prod
+                        Memory: 128
+                        Environment:
+                            -   Name: APPMESH_VIRTUAL_NODE_NAME
+                                Value: !Sub mesh/servicemesh-demo/virtualNode/${AppName}-ecs
+                            -   Name: ENVOY_LOG_LEVEL
+                                Value: info
+                        LogConfiguration:
+                            LogDriver: awslogs
+                            Options:
+                                awslogs-group: !Ref EnvoyLogGroup
+                                awslogs-region: !Ref AWS::Region
+                        LinuxParameters:
+                            InitProcessEnabled: true
+                        HealthCheck:
+                            Command: [ "CMD-SHELL", "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE" ]
+                            StartPeriod: 120
+                            Retries: 3
+                            Timeout: 5
+                            Interval: 60
+                    -   !Ref "AWS::NoValue"
+            ProxyConfiguration: !If
+                -   Provider
+                -   ContainerName: envoy
+                    Type: APPMESH
+                    ProxyConfigurationProperties: 
+                        !If 
+                            -   Provider
+                            -
+                                -   Name: IgnoredUID
+                                    Value: 1337
+                                -   Name: ProxyIngressPort
+                                    Value: 15000
+                                -   Name: ProxyEgressPort
+                                    Value: 15001
+                                -   Name: AppPorts
+                                    Value: 3000
+                                -   Name: EgressIgnoredIPs
+                                    Value: 169.254.170.2,169.254.169.254
+                            - !Ref "AWS::NoValue"
+                -   !Ref "AWS::NoValue"

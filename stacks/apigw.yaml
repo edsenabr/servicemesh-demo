@@ -1,0 +1,201 @@
+###############################################################################
+#
+# Generic Service
+#
+###############################################################################
+
+Parameters:
+    NLBEndpoint:
+        Type: String
+
+    VPCEndpoint:
+        Type: String
+
+    NLBID:
+        Type: String
+
+Resources:
+###############################################################################
+#
+# Log Groups
+#
+###############################################################################
+    APILogGroup:
+        Type: AWS::Logs::LogGroup
+        Properties:
+            LogGroupName: service-consumer-api
+            RetentionInDays: 1
+
+###############################################################################
+#
+# Log Groups
+#
+###############################################################################
+
+
+    VPCLink:
+        Type: AWS::ApiGateway::VpcLink
+        Properties: 
+            Description: Created to allow the API Gateway to communicate with the backend services.
+            Name: servicemesh-demo-vpclink 
+            TargetArns: 
+                - !Ref NLBID
+
+
+###############################################################################
+#
+# API
+#
+###############################################################################
+    APIGWCloudWatchRole:
+        Type: 'AWS::IAM::Role'
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    -   Effect: Allow
+                        Principal:
+                            Service:
+                                -   apigateway.amazonaws.com
+                        Action: 'sts:AssumeRole'
+            Path: /
+            ManagedPolicyArns:
+                - >-
+                    arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+
+    Account:
+        Type: 'AWS::ApiGateway::Account'
+        Properties:
+            CloudWatchRoleArn: !GetAtt APIGWCloudWatchRole.Arn
+
+    API:
+        Type: AWS::ApiGateway::RestApi
+        DependsOn: 
+            -   Account
+            -   VPCLink
+        Properties: 
+            Name: servicemesh-demo-api
+            Description: Demo api, exposing both nodejs and crystal services
+            EndpointConfiguration: 
+                Types: 
+                    - PRIVATE
+                VpcEndpointIds: 
+                    - !Ref VPCEndpoint
+            Policy: !Sub |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": "*",
+                            "Action": "execute-api:Invoke",
+                            "Resource": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*"
+                        },
+                        {
+                            "Effect": "Deny",
+                            "Principal": "*",
+                            "Action": "execute-api:Invoke",
+                            "Resource": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*",
+                            "Condition": {
+                                "StringNotEquals": {
+                                    "aws:SourceVpce": "${VPCEndpoint}"
+                                }
+                            }
+                        }
+                    ]
+                }
+
+
+    NodeJS:
+        Type: AWS::ApiGateway::Resource
+        DependsOn: API
+        Properties: 
+            ParentId: !GetAtt API.RootResourceId
+            PathPart: nodejs
+            RestApiId: !Ref API
+
+    Crystal:
+        Type: AWS::ApiGateway::Resource
+        DependsOn: API
+        Properties: 
+            ParentId: !GetAtt API.RootResourceId
+            PathPart: crystal
+            RestApiId: !Ref API
+
+    GETNodeJS:
+        Type: AWS::ApiGateway::Method
+        DependsOn: NodeJS
+        Properties:
+            AuthorizationType: NONE
+            HttpMethod: GET
+            Integration: 
+                  ConnectionId: !Ref VPCLink
+                  ConnectionType: VPC_LINK
+                  IntegrationHttpMethod: GET
+                  IntegrationResponses: 
+                    -   StatusCode: 200
+                  TimeoutInMillis: 29000
+                  Type: HTTP
+                  Uri: !Sub http://${NLBEndpoint}:3001/
+                
+            MethodResponses: 
+                -   StatusCode: 200
+                
+            OperationName: nodejs
+            ResourceId: !Ref NodeJS
+            RestApiId: !Ref API
+
+    GETCrystal:
+        Type: AWS::ApiGateway::Method
+        DependsOn: Crystal
+        Properties:
+            AuthorizationType: NONE
+            HttpMethod: GET
+            Integration: 
+                  ConnectionId: !Ref VPCLink
+                  ConnectionType: VPC_LINK
+                  IntegrationHttpMethod: GET
+                  IntegrationResponses: 
+                    -   StatusCode: 200
+                  TimeoutInMillis: 29000
+                  Type: HTTP
+                  Uri: !Sub http://${NLBEndpoint}:3002/crystal/
+            MethodResponses: 
+                -   StatusCode: 200
+            OperationName: crystal
+            ResourceId: !Ref Crystal
+            RestApiId: !Ref API
+
+    Stage:
+        Type: AWS::ApiGateway::Stage
+        DependsOn: API
+        Properties:
+            AccessLogSetting:
+                DestinationArn: !GetAtt APILogGroup.Arn
+            CacheClusterEnabled: false
+            DeploymentId: !Ref Deployment
+            Description: default stage for running the api
+            MethodSettings: 
+                -   ResourcePath: /*
+                    HttpMethod: GET
+                    CachingEnabled: false
+                    DataTraceEnabled: true
+                    LoggingLevel: INFO
+                    MetricsEnabled: true
+            RestApiId: !Ref API
+            StageName: default
+            TracingEnabled: true
+
+    Deployment:
+        Type: AWS::ApiGateway::Deployment
+        DependsOn:
+            - GETCrystal
+            - GETNodeJS
+        Properties: 
+            Description: default deployment
+            RestApiId: !Ref API
+
+Outputs:
+    API:
+        Description: ID of the REST API created by this stack
+        Value: !Ref API

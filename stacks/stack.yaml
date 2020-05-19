@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Deploys the full stack of the Service Mesh demo from https://github.com/edsenabr/servicemesh-demo
+Resources:
+  ProviderStack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties: 
+      Parameters: 
+        Role: provider
+      TemplateURL: "https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/base.yaml"
+
+  ConsumerStack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties: 
+      Parameters: 
+        Role: consumer
+      TemplateURL: "https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/base.yaml"
+
+  NodeJSService:
+    Type: "AWS::CloudFormation::Stack"
+    DependsOn: ProviderStack
+    Properties: 
+      Parameters: 
+        AppName: nodejs
+        DesiredInstances: 2
+        Role: provider
+        VPCCIDR: !GetAtt ProviderStack.Outputs.VPCCIDR
+        VPCID: !GetAtt ProviderStack.Outputs.VPCID
+        NLBID: !GetAtt ProviderStack.Outputs.NLBID
+        ALBID: !GetAtt ProviderStack.Outputs.ALBID
+        SDID: !GetAtt ProviderStack.Outputs.SDID
+        PrivateSubnets: !GetAtt ProviderStack.Outputs.PrivateSubnets
+      TemplateURL: "https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/service.yaml"
+
+  CrystalService:
+    Type: "AWS::CloudFormation::Stack"
+    DependsOn: ProviderStack
+    Properties: 
+      Parameters: 
+        AppName: crystal
+        DesiredInstances: 2
+        Role: provider
+        VPCCIDR: !GetAtt ProviderStack.Outputs.VPCCIDR
+        VPCID: !GetAtt ProviderStack.Outputs.VPCID
+        NLBID: !GetAtt ProviderStack.Outputs.NLBID
+        ALBID: !GetAtt ProviderStack.Outputs.ALBID
+        SDID: !GetAtt ProviderStack.Outputs.SDID
+        PrivateSubnets: !GetAtt ProviderStack.Outputs.PrivateSubnets
+      TemplateURL: "https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/service.yaml"
+
+  FrontendUI:
+    Type: "AWS::CloudFormation::Stack"
+    DependsOn: ProviderStack
+    Properties: 
+      Parameters: 
+        AppName: frontend
+        DesiredInstances: 2
+        Role: provider
+        VPCCIDR: !GetAtt ProviderStack.Outputs.VPCCIDR
+        VPCID: !GetAtt ProviderStack.Outputs.VPCID
+        NLBID: !GetAtt ProviderStack.Outputs.NLBID
+        ALBID: !GetAtt ProviderStack.Outputs.ALBID
+        SDID: !GetAtt ProviderStack.Outputs.SDID
+        PrivateSubnets: !GetAtt ProviderStack.Outputs.PrivateSubnets
+      TemplateURL: "https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/service.yaml"
+
+  APIGW:
+    Type: "AWS::CloudFormation::Stack"
+    DependsOn: 
+      - ProviderStack
+      - ConsumerStack
+      - CrystalService
+      - NodeJSService
+    Properties: 
+      Parameters: 
+        NLBEndpoint: !GetAtt ProviderStack.Outputs.NLBEndpoint
+        NLBID: !GetAtt ProviderStack.Outputs.NLBID
+        VPCEndpoint: !GetAtt ConsumerStack.Outputs.VPCEndpoint
+      TemplateURL: "https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/apigw.yaml"
+
+  NorthFrontendUI:
+    Type: "AWS::CloudFormation::Stack"
+    DependsOn: APIGW
+    Properties: 
+      Parameters: 
+        AppName: frontend
+        DesiredInstances: 2
+        Role: consumer
+        API: !GetAtt APIGW.Outputs.API
+        VPCCIDR: !GetAtt ConsumerStack.Outputs.VPCCIDR
+        VPCID: !GetAtt ConsumerStack.Outputs.VPCID
+        NLBID: !GetAtt ProviderStack.Outputs.NLBID
+        ALBID: !GetAtt ConsumerStack.Outputs.ALBID
+        SDID: !GetAtt ProviderStack.Outputs.SDID
+        PrivateSubnets: !GetAtt ConsumerStack.Outputs.PrivateSubnets
+      TemplateURL: "https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/service.yaml"
+          
+Outputs:
+  RedScenarioURL:
+    Description: URL to access the Red Scenario frontend UI 
+    Value: !GetAtt ConsumerStack.Outputs.ALBEndpoint
+  BlueScenarioURL:
+    Description: URL to access the Blue Scenario frontend UI 
+    Value: !GetAtt ProviderStack.Outputs.ALBEndpoint
+  APIGWURL:
+    Description: URL to access the API Gateway Console
+    Value: !Sub
+      - https://console.aws.amazon.com/apigateway/home?region=${AWS::Region}#/apis/${API}/resources
+      - API: !GetAtt APIGW.Outputs.API
