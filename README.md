@@ -120,6 +120,4 @@ This template is used to instantiate the resources needed for the red scenario. 
 
 ### Getting Started
 
-Click [here](https://console.aws.amazon.com/cloudformation/designer/home?&templateURL=https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/stack.yaml){:target="_blank" rel="noopener"} to deploy this stack on your AWS Account.
-
-In order to deploy this topology on your AWS account, clone this repository and deploy each template in the order mentioned above. Remember that you need to deploy the service stack 3 times (one for each application). If you need detailed instructions, follow [this](./) guide.
+Click [here](https://console.aws.amazon.com/cloudformation/designer/home?&templateURL=https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/stack.yaml) to deploy this stack on your AWS Account using Cloud Formation. If you want to extend/play with this demo, the template sources are included in this github repository.
