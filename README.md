@@ -135,6 +135,6 @@ This is a master template that you can use to deploy the whole solution on your 
 
 ### Getting Started
 
-Click [here](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateURL=https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/stack.yaml&stackName=servicemesh-demo) to deploy this stack on your AWS Account using CloudFormation and play with it. After the stack finishes deploying (it might take up to 20 minutes), navigate to its 'Outputs' tab to get the URLs for the frontend UI on both Red and Blue scenarios.  
+Click <a href="https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateURL=https://servicemesh-demo-templates.s3-sa-east-1.amazonaws.com/stack.yaml&stackName=servicemesh-demo" target="_blank">here</a> to deploy this stack on your AWS Account using CloudFormation and play with it. After the stack finishes deploying (it might take up to 20 minutes), navigate to its 'Outputs' tab to get the URLs for the frontend UI on both Red and Blue scenarios.  
 
 If you want to extend or make modifications on this demo, the template sources are included in this github repository, inside the [stacks](./stacks) folder.
