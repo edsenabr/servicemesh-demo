@@ -63,7 +63,7 @@ There are a few concepts hidden on the previous diagram that needs to be explore
 
 - When the frontend UI makes a request to a backend service, it uses its ***Virtual Service*** name. Since containers are ephemeral, the only way that the frontend service can figure out where the backend service is running, is by relying on a 'Service Discovery' component.    
 &nbsp;  
-Every time a new task is started at the ECS cluster, the ECS service registers this task on AWS Cloud Map, and a DNS entry is created on Route 53 for this task. The ***Virtual Service*** is this name used to register the task.
+Every time a new task is started at the ECS cluster, the ECS service registers this task on AWS Cloud Map, and a DNS entry is created on Route 53 for it. The ***Virtual Service*** is this name used to register the task.
 
 - Instead of directly reaching the ***Virtual Node*** (which can be done), the frontend UI is talking to the ***Virtual Router*** component. ***The Virtual Router*** abstracts the connectivity to several distinct ***Virtual Nodes***, adding intelligence to the routing logic. For instance, if you want to setup a blue/green deployment of one of the backend services, you could add the routing rules on this component.  
 
@@ -74,7 +74,7 @@ Every time a new task is started at the ECS cluster, the ECS service registers t
 
 - Despite the fact that API Gateway is a public AWS service, it has the ability to host private APIs exposed only to authorized VPCs, through the use of ***Interface Endpoints*** deployed onto those VPCs. This setup enables private communication between the service consumer and the API itself.
 
-- For accessing private services on a AWS Account without having the need to expose them on the internet, API Gateway has the ability to leverage a ***VPC Link*** integration. This setup allows a private communication between the API and its backend services. 
+- For accessing private services deployed on a VPC without having the need to expose them on the internet, API Gateway has the ability to leverage a ***VPC Link*** integration deployed onto that VPC. This setup allows a private communication between the API and its backend services. 
 
 - You can see that the backend services (nodejs, crystal) are the same ones being accessed in the previous scenario. This setup demonstrates that a service lying on a mesh can be exposed to consumers outside of it as well.  
 
@@ -88,7 +88,7 @@ For simplicity sake, this project was split into 4 reusable Cloud Formation temp
 
 1. **base.yaml**
 &nbsp;  
-Deployed twice, creates the base stack for the **Service Provider (South)** and **Service Consumer (North)**  :
+Deployed twice, creates the base stack for the **Service Provider (South)** and **Service Consumer (North)** zones :
 	-	VPC and its related components
 	-	ECS cluster its related components
 	-	**Application** Load Balancer
@@ -115,7 +115,7 @@ Deployed 4 times, deploy an application onto the respective ECS cluster and its 
 
 3.	**apigw.yaml**
 &nbsp;  
-This template is used to instantiate the resources needed for the red scenario. It deploys the frontend UI as a Task Definition onto the **consumer** ECS Cluster and the same components related to it described on the previous template. In addition to that it deploys the following API Gateway components:
+This template is used to instantiate the API Gateway resources needed for the red scenario.It deploys the following  components:
 	- Private REST API 
 	-	Resource and Method for the nodejs backend
 	-	Resource and Method for the crystal backend
@@ -125,13 +125,13 @@ This template is used to instantiate the resources needed for the red scenario. 
 3.	**stack.yaml**
 &nbsp;  
 This is a master template that you can use to deploy the whole solution on your AWS Account. It deploy the following stacks:
-	- Service Provider (South) base stack
-	- Service Consumer (North) base stack
-	- Crystal backend service on the South stack
-	- NodeJS backend service on the South stack
-	- Frontend UI on the South stack
-	- Frontend UI on the North stack
-	- API Gateway private REST APIs
+	- Service Provider (South) base stack (using base.yaml)
+	- Service Consumer (North) base stack (using base.yaml)
+	- Crystal backend service on the South stack (using service.yaml)
+	- NodeJS backend service on the South stack (using service.yaml)
+	- Frontend UI on the South stack (using service.yaml)
+	- Frontend UI on the North stack (using service.yaml)
+	- API Gateway private REST APIs (using apigw.yaml)
 
 ### Getting Started
 
